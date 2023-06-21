@@ -1,36 +1,105 @@
+"""
+Little Lemon API Views
+
+Custom IsManagerOrAdminUser permissions class used to validate
+whether requestor is authenticated and is either Staff (Admin)
+or part of the Manager group. 
+
+Global AnonRateThrottle and UserRateThrottle are applied.
+"""
+
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User, Group
-from rest_framework import generics, status, authentication, permissions
+from rest_framework import generics, status
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from .models import Category, MenuItem, Cart, Order, OrderItem
 from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, UserSerializer
 
 
+class IsManagerOrAdminUser(BasePermission):
+    """
+    Validtes User is Admin or Manager Group User
+    """
+    def has_permission(self, request, view):
+        """
+        Checks the IsAdminUser properties and if Manager Group exists
+
+        The IsAdminUser permissions class checks that the user is 
+        authenticated and is Staff enabled. This also validates that 
+        the user has the Manager group membership.
+
+        Alternatively, one could just validate group membership
+        and do a bitwise check in the `permission_classes` like
+        
+        `permission_classes = [IsManagerUser | IsAdminUser]`
+        """
+        user = request.user
+        is_manager = user.groups.filter(name='Manager').exists()
+        return user.is_authenticated and (user.is_staff or is_manager)
+
+
 class CategoriesView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    search_fields = ['title']
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsManagerOrAdminUser()]
+        else:
+            return []
 
 
-class MenuItemsView(generics.ListCreateAPIView):
-    throttle_classes = [AnonRateThrottle, UserRateThrottle]
+class MenuItemsListView(generics.ListCreateAPIView):
     queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
     ordering_fields = ['price']
     filterset_fields = ['price']
     search_fields = ['title', 'category__title']
 
-class SingleMenuItemView(generics.RetrieveUpdateDestroyAPIView):
-    throttle_classes = [AnonRateThrottle, UserRateThrottle]
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsManagerOrAdminUser()]
+        else:
+            return []
+
+
+class MenuItemView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
-    
-    def get_queryset(self, request, pk):
-        return get_object_or_404(MenuItem, pk=pk)
+
+    def get_permissions(self):
+        if self.request.method != 'GET':
+            return [IsManagerOrAdminUser()]
+        else:
+            return []
 
 
 class CartView(generics.ListCreateAPIView):
+    """
+    View your Cart
+    """
+    serializer_class = CartSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Cart.objects.filter(user=user)
+
+    def delete(self, request, *args, **kwargs):
+        Cart.objects.all().filter(user=request.user).delete()
+        return Response("Cart emptied", status.HTTP_204_NO_CONTENT)
+
+
+class CartDeleteView(generics.DestroyAPIView):
+    """
+    Destroy the Cart
+    """
     queryset = Cart.objects.all()
     serializer_class = CartSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class OrdersView(generics.ListCreateAPIView):
@@ -43,43 +112,99 @@ class OrderItemsView(generics.ListCreateAPIView):
     serializer_class = OrderItemSerializer
 
 
-class ManageGroupView(generics.ListCreateAPIView):
-    queryset = User.objects.filter(groups__name__in=['Manager'])
-    serializer_class = UserSerializer
-    authentication_classes = [authentication.TokenAuthentication]
-    permission_classes = [permissions.IsAdminUser]
-    
-    def post(self, request):
-        """
-        Assign a user to the manager group or lists all managers
-        """
-        username = request.data['username']
-        if username:
-            user = get_object_or_404(User, username=username)
-            managers = Group.objects.get(name='Manager')
-            managers.user_set.add(user)
-            return Response(UserSerializer(user).data, status.HTTP_201_CREATED)
-
-        return Response(status.HTTP_404_NOT_FOUND)
-
-
-class ManageGroupDeleteView(generics.RetrieveDestroyAPIView):
+class ManagerGroupView(generics.ListCreateAPIView, generics.DestroyAPIView):
     """
-    Remove a manager for a given pk in URL path
+    Handles adding and removing users from Manager group
     """
-    queryset = Group.objects.get(name='Manager')
+    queryset = User.objects.filter(groups__name='Manager')
     serializer_class = UserSerializer
-    authentication_classes = [authentication.TokenAuthentication]
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsManagerOrAdminUser]
 
-    def delete(self, request, pk):
-        user = get_object_or_404(User, pk=pk)
+    def post(self, request, *args, **kwargs):
+        """
+        Adds user to Manager group by username in POST
+        """
+        username = self.request.data.get('username')
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                f"User {username} does not exist",
+                status.HTTP_404_NOT_FOUND
+            )
+        
+        if user.groups.filter(name='Manager').exists():
+            return Response(
+                f"User {user} is already a Manager",
+                status.HTTP_200_OK
+            )
+        
+        managers = Group.objects.get(name='Manager')
+        managers.user_set.add(user)
+        print(managers)
+        print(type(managers))
+        return Response(
+            f'User {user} added to Managers',
+            status.HTTP_201_CREATED
+        )
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Removes user from Manager group based on <int:pk> URI
+        """
+        user = self.get_object()  # Retrieve user based on URL pk
         managers = Group.objects.get(name='Manager')
         managers.user_set.remove(user)
-        response = Response(
-            {
-                "message": f"user {user.username} removed from Manager group"
-            }, 
-            status.HTTP_200_OK)
-        return response
+        return Response(
+            f'User {user} removed from Managers',
+            status.HTTP_204_NO_CONTENT
+        )
 
+
+class DeliveryGroupView(generics.ListCreateAPIView, generics.DestroyAPIView):
+    """
+    Handles adding and removing users from Delivery group
+    """
+    queryset = User.objects.filter(groups__name='Delivery Crew')
+    serializer_class = UserSerializer
+    permission_classes = [IsManagerOrAdminUser]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Adds user to Delivery group by username in POST
+        """
+        username = self.request.data.get('username')
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                f"User {username} does not exist",
+                status.HTTP_404_NOT_FOUND
+            )
+
+        if user.groups.filter(name='Delivery Crew').exists():
+            return Response(
+                f"User {user} is already in Delivery Crew",
+                status.HTTP_200_OK
+            )
+        
+        managers = Group.objects.get(name='Delivery Crew')
+        managers.user_set.add(user)
+        print(managers)
+        print(type(managers))
+        return Response(
+            f'User {user} added to Delivery Crew',
+            status.HTTP_201_CREATED
+        )
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Removes user from Delivery group based on <int:pk> URI
+        """
+        user = self.get_object()  # Retrieve user based on URL pk
+        managers = Group.objects.get(name='Delivery Crew')
+        managers.user_set.remove(user)
+        return Response(
+            f'User {user} removed from Delivery Crew',
+            status.HTTP_204_NO_CONTENT
+        )

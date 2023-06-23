@@ -13,7 +13,7 @@ from django.contrib.auth.models import User, Group
 from rest_framework import generics, status
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+from rest_framework.exceptions import PermissionDenied
 from .models import Category, MenuItem, Cart, Order, OrderItem
 from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, UserSerializer
 
@@ -38,6 +38,16 @@ class IsManagerOrAdminUser(BasePermission):
         user = request.user
         is_manager = user.groups.filter(name='Manager').exists()
         return user.is_authenticated and (user.is_staff or is_manager)
+
+
+class IsDeliveryCrewUser(BasePermission):
+    """
+    Checks if the user is authenticated and belongs to Delivery Crew
+    """
+    def has_permission(self, request, view):
+        user = request.user
+        is_delivery_crew = user.groups.filter(name='Delivery Crew').exists()
+        return user.is_authenticated and is_delivery_crew
 
 
 class CategoriesView(generics.ListCreateAPIView):
@@ -103,13 +113,87 @@ class CartDeleteView(generics.DestroyAPIView):
 
 
 class OrdersView(generics.ListCreateAPIView):
-    queryset = Order.objects.all()
     serializer_class = OrderSerializer
 
+    def get_queryset(self):
+        user = self.request.user
+        if user.groups.filter(name='Manager').exists():
+            return Order.objects.all()
+        elif user.groups.filter(name='Delivery Crew').exists():
+            return Order.objects.filter(delivery_crew=user)
+        else:
+            return Order.objects.filter(user=user)
+    
+    def get_permissions(self):
+        method = self.request.method
+        if method in ('DELETE', 'PUT'):
+            permission_classes = [IsManagerOrAdminUser]
+        elif method == 'PATCH':
+            permission_classes = [IsDeliveryCrewUser]
+        elif method == 'POST':
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAuthenticated]
+        
+        return [permission() for permission in permission_classes]
 
-class OrderItemsView(generics.ListCreateAPIView):
-    queryset = OrderItem.objects.all()
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+        order = serializer.instance
+        cart = Cart.objects.filter(user=self.request.user)
+        items = [create_order_item(order, item) for item in cart]
+        order.total = sum(item.price for item in items)
+        order.save()
+        cart.delete()
+    
+
+
+class OrderItemsView(generics.ListAPIView, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = OrderItemSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        order = self.kwargs['pk']
+
+        if user.groups.filter(name='Manager').exists():
+            return OrderItem.objects.all()
+        elif user.groups.filter(name='Delivery Crew').exists():
+            return OrderItem.objects.filter(order__delivery_crew=user)
+        elif Order.objects.filter(user=user, id=order).exists():
+            return OrderItem.objects.filter(order__id=order)
+        
+        raise PermissionDenied("You are not allowed to access this order")
+
+    def patch(self, request, *args, **kwargs):
+        """
+        Modify Order
+
+        This PATCH request has 2 scenarios, when the manager
+        submits a delivery crew member assignment and when
+        a delivery crew member updates the order status.
+        """
+        order = self.get_object()
+        user = self.request.user
+        if user.groups.filter(name='Manager').exists():
+            delivery_crew = request.data.get('delivery_crew')
+            if delivery_crew is not None:
+                try:
+                    delivery_crew = User.objects.get(id=delivery_crew, groups__name='Delivery Crew')
+                    order.delivery_crew = delivery_crew
+                    order.save()
+                    serializer = self.get_serializer(order)
+                    return Response(serializer.data)
+                except User.DoesNotExist:
+                    return Response({'detail': 'Invalid delivery crew'}, status=status.HTTP_400_BAD_REQUEST)
+        elif user.groups.filter(name='Delivery Crew').exists():
+            status_value = request.data.get('status')
+            if status_value is not None:
+                order.status = status_value
+                order.save()
+                serializer = self.get_serializer(order)
+                return Response(serializer.data)
+        
+        raise PermissionDenied("You are not allowed to modify this order.")
 
 
 class ManagerGroupView(generics.ListCreateAPIView, generics.DestroyAPIView):
@@ -208,3 +292,14 @@ class DeliveryGroupView(generics.ListCreateAPIView, generics.DestroyAPIView):
             f'User {user} removed from Delivery Crew',
             status.HTTP_204_NO_CONTENT
         )
+
+
+def create_order_item(order, item):
+    order_item = OrderItem.objects.create(
+            order=order,
+            menuitem=item.menuitem,
+            quantity = item.quantity,
+            unit_price = item.unit_price,
+            price = item.price)
+    order_item.save()
+    return order_item

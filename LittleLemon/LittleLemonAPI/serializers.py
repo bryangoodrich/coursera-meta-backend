@@ -1,17 +1,18 @@
 from rest_framework import serializers
+from rest_framework.serializers import ModelSerializer
 from .models import Category, MenuItem, Cart, Order, OrderItem
 from django.contrib.auth.models import User
 from datetime import date
 
 
-class CategorySerializer(serializers.ModelSerializer):
+class CategorySerializer(ModelSerializer):
     """ Category Serializer """
     class Meta:
         model = Category
         fields = ['id','title']
 
 
-class MenuItemSerializer(serializers.ModelSerializer):
+class MenuItemSerializer(ModelSerializer):
     """ Menu Item Serializer """
     category_id = serializers.IntegerField(write_only=True)
     category = CategorySerializer(read_only=True)
@@ -21,7 +22,7 @@ class MenuItemSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'featured', 'price', 'category', 'category_id']
 
 
-class CartSerializer(serializers.ModelSerializer):
+class CartSerializer(ModelSerializer):
     """ Cart Serializer """
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     unit_price = serializers.ReadOnlyField(source='menuitem.price')
@@ -64,7 +65,7 @@ class CartSerializer(serializers.ModelSerializer):
     
 
 
-class OrderSerializer(serializers.ModelSerializer):
+class OrderSerializer(ModelSerializer):
     """ Order Serializer """
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     total = serializers.DecimalField(6, 2, read_only=True)
@@ -90,16 +91,22 @@ class OrderSerializer(serializers.ModelSerializer):
         return order
 
 
-class OrderItemSerializer(serializers.ModelSerializer):
-     """ Order Item Serializer """
-     class Meta:
+class OrderItemSerializer(ModelSerializer):
+    """ Order Item Serializer """
+    class Meta:
         model = OrderItem
-        fields = ['id', 'order', 'menuitem', 'quantity', 'unit_price', 'price']
-    
-    
+        fields = ['menuitem', 'quantity', 'unit_price', 'price']
 
 
-class UserSerializer(serializers.ModelSerializer):
+class OrderDetailSerializer(ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True, source='orderitem_set')
+
+    class Meta:
+        model = Order
+        fields = ['id', 'status', 'date', 'total', 'user', 'delivery_crew', 'items']
+
+
+class UserSerializer(ModelSerializer):
     """
     Display users generically
     """

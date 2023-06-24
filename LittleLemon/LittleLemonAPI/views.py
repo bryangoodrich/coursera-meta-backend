@@ -74,6 +74,13 @@ class MenuItemsListView(generics.ListCreateAPIView):
             return [IsManagerOrAdminUser()]
         else:
             return []
+    
+    def get_queryset(self):
+        queryset = MenuItem.objects.all()
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category__title=category)
+        return queryset
 
 
 class MenuItemView(generics.RetrieveUpdateDestroyAPIView):
@@ -177,7 +184,7 @@ class OrderItemsView(generics.RetrieveUpdateDestroyAPIView):
         if user.groups.filter(name='Manager').exists():
             delivery_crew = request.data.get('delivery_crew')
             if delivery_crew is None:
-                return Response("Delivery Crew was not provided", status.HTTP_400_BAD_REQUEST)
+                return Response({'detail': 'Delivery Crew was not provided'}, status.HTTP_400_BAD_REQUEST)
             try:
                 delivery_crew = User.objects.get(username=delivery_crew, groups__name='Delivery Crew')
                 order.delivery_crew = delivery_crew
@@ -188,17 +195,15 @@ class OrderItemsView(generics.RetrieveUpdateDestroyAPIView):
                 return Response({'detail': 'Invalid delivery crew'}, status=status.HTTP_400_BAD_REQUEST)
         elif user.groups.filter(name='Delivery Crew').exists():
             status_value = request.data.get('status')
-            if status_value is not None:
-                order.status = status_value
-                order.save()
-                serializer = self.get_serializer(order)
-                return Response(serializer.data)
+            if status_value is None:
+                return Response({'detail': 'Order status not provided'}, status=status.HTTP_400_BAD_REQUEST)
+            order.status = status_value
+            order.save()
+            serializer = self.get_serializer(order)
+            return Response(serializer.data)
         
         raise PermissionDenied("You are not allowed to modify this order.")
-    
-    def patch(self, request, *args, **kwargs):
-        kwargs['partial'] = True
-        self.put(request, *args, **kwargs)
+
 
 
 class ManagerGroupView(generics.ListCreateAPIView, generics.DestroyAPIView):

@@ -1,0 +1,32 @@
+# Artanis -> Admin (staff)
+# Adrian -> Delivery Crew
+# Sana -> Manager
+# Mario -> Customer + Test into and out of Manager/Delivery
+# Jon -> Customer only
+# Beth -> Another customer used in UAT (see requests/uat.http)
+# Use VS Code REST Client for submitting REST requests to the server
+
+
+username: Artanis (Admin)
+email: 
+password: #django23!
+
+username: Adrian
+email: adrian@littlelemon.com
+password: lemon@adr!
+
+username: Mario
+email: mario@littlelemon.com
+password: lemon@mar!
+
+username: Sana
+email: sana@littlelemon.com
+password: lemon@san!
+
+username: Jon
+email: JonDoe@littlelemon.com
+password: lemon@jon!
+
+email: beth@littlelemon.com
+username: Beth
+password: lemon@beth!

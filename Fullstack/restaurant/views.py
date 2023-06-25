@@ -27,11 +27,11 @@ def book(request):
     context = {'form': form}
     return render(request, 'book.html', context)
 
-def booking(request):
+def bookings(request):
     date = request.GET.get('date', datetime.today().date())
     bookings = Booking.objects.all()
     booking_json = serializers.serialize('json', bookings)
-    return render(request, 'booking.html', {'bookings': booking_json})
+    return render(request, 'bookings.html', {'bookings': booking_json})
 
 
 def menu(request):

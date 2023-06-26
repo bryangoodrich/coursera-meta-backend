@@ -4,7 +4,7 @@ from .forms import BookingForm
 from .models import Menu
 from django.core import serializers
 from .models import Booking
-from datetime import datetime
+from datetime import datetime, date
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -66,9 +66,7 @@ def bookings(request):
         else:
             return HttpResponse("{'error':1}", content_type='application/json')
     
-    
-    date = request.GET.get('date', datetime.today().date())
-    print(f"The date varible is {date}")
-    bookings = Booking.objects.all().filter(reservation_date=date)
+    dt = request.GET.get('date', date.today().isoformat())
+    bookings = Booking.objects.all().filter(reservation_date=dt)
     booking_json = serializers.serialize('json', bookings)
     return HttpResponse(booking_json, content_type='application/json')

@@ -156,3 +156,39 @@ Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
     "Inventory": 0
 }
 
+
+
+######################
+# Testing Step 3
+# Minimal Booking API Testing
+# 
+# Not required, so I'll be brief on these. 
+# Remember, these are handled by the Router in
+# the project package urls (URLConf).
+######################
+
+### GET CURRENT (EMPTY) LISTINGS
+GET http://127.0.0.1:8000/restaurant/booking/tables HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+### BOOK A TABLE
+POST http://127.0.0.1:8000/restaurant/booking/tables HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Name": "Aaron",
+    "No_of_guests": 3,
+    "BookingDate": "2023-07-03T18:30:00Z"
+}
+
+### YAY! IT'S THERE.
+GET http://127.0.0.1:8000/restaurant/booking/tables HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+### NOW I DELETE IT
+DELETE http://127.0.0.1:8000/restaurant/booking/tables/1 HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8

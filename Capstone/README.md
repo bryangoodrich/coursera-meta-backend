@@ -1,6 +1,6 @@
 # Meta Back-End Developer Capstone
 
-If you have cloned this repo for grading I have taken the time to validate everything on my own project. I will guide you to what you need to look at to confirm.
+If you have cloned this repo for grading I have taken the time to validate everything on my own project. I will guide you to what you need to look at to confirm. While there is a `Readme.txt` with the 2 endpoints we created for testing, that's all covered below in this `README.md` file.
 
 First, in this directory you can `pipenv shell` to start a local virtual environment. Then run `pipenv install` or `pipenv update` to make sure the dependencies are satisfied. 
 
@@ -49,6 +49,8 @@ DATABASES = {
 * Are the menu and table booking APIs implemented?
 
 I don't think we really tested the booking APIs in this course compared to the Full Stack course (and they're implemented differently). Nevertheless, see my `test.http` file in the restaurant application. Ensure your Visual Studio Code has the REST Client extension installed. You can simply click the "send request" button above each command to interact with the API.
+
+Note, I did add a simple user test of the bookings API. Note, all endpoints do not have trailing slashes, per the requirements taught in the classes that APIs should not have them (so if you see an error, make sure you remove trailing slashes!).
 
 In any case, you can also go to http://127.0.0.1:8000/restaurant/menu to see the running endpoint in the browsable interface.
 

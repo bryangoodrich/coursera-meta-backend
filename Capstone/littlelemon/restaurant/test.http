@@ -1,0 +1,158 @@
+##########################################################################
+# This file is designed for the Visual Studio Code REST Client extension. 
+# Files with the .http extension automatically are seen to issue HTTP 
+# headers. To use, simply click the "send request" button above each 
+# section. To delimit a sectinon, 3 hash marks are used (###) so all tests 
+# can be triggered in sequence manually, easily.
+#
+# The common format to copy-and-paste is the following. Simply uncomment
+# using CTRL+/
+#
+# GET http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+# Content-Type: application/json
+# Authorization: Token ...
+##########################################################################
+
+
+######################
+# Testing Step 1. 
+# Validate Menu Item Creation
+# 
+# Initially this returns no items from DB
+# Create a few Items using an authenticated user (aaron).
+# Test items are returned.
+# Then we create a 4th item and delete it.
+# Lastly, we'll update the inventory on an item.
+######################
+
+###  LIST MENU ITEMS
+GET http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+
+
+### ADD ITEM 1
+# Now let's add a few menu items
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "Shrimp Scampi",
+    "Price": "18.99",
+    "Inventory": 3
+}
+
+### ADD ITEM 2
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "Spaghetti",
+    "Price": 12.99,
+    "Inventory": 2
+}
+
+### ADD ITEM 3
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "Cheesecake",
+    "Price": 9.99,
+    "Inventory": 1
+}
+
+### ADD ITEM 4
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "ToManyItems",
+    "Price": 9.99,
+    "Inventory": 1
+}
+
+### REMOVE ITEM 4
+DELETE http://127.0.0.1:8000/restaurant/menu/4 HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+### UPDATE ITEM 3 INVENTORY=5
+PATCH http://127.0.0.1:8000/restaurant/menu/3 HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{"Inventory": 5}
+
+###  LIST MENU ITEMS AGAIN
+GET http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+
+
+######################
+# Testing Step 2
+# Validate validators
+# 
+# Now that there is data, let's test that things error
+# responsibly. Note, these can also be setup in
+# TestCases for automation.
+######################
+
+### INVENTORY MUST BE 5 OR FEWER
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "InventoryFailure",
+    "Price": 1.11,
+    "Inventory": 6
+}
+
+### INVENTORY MUST BE NONNEGATIVE
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "InventoryFailure",
+    "Price": 1.11,
+    "Inventory": -1
+}
+
+### PRICE MUST BE 2 DECIMAL PLACES
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "PriceFailure",
+    "Price": 1.119,
+    "Inventory": 0
+}
+
+### PRICE MUST BE 10 DIGITS OR FEWER
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "PriceFailure",
+    "Price": 12345678900.11,
+    "Inventory": 0
+}
+
+### TITLE MUST BE LESS THAN 256 CHARACTERS
+POST http://127.0.0.1:8000/restaurant/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Token 5d83c80317f64e2f0a904e967340a9739a5e0fb8
+
+{
+    "Title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "Price": 9.99,
+    "Inventory": 0
+}
+

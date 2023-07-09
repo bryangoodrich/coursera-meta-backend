@@ -1,4 +1,4 @@
-# coursera-meta-backend-littlelemon
+# coursera-meta-backend
 
 A repo for my Coursera Meta Back-End Developer certification course work and codespace.
 
